@@ -2,28 +2,120 @@
 <html>
 <head>
     <title>House Price Predictor</title>
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI';
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            transition: 0.3s;
+        }
+
+        .dark {
+            background: #1a202c;
+            color: white;
+        }
+
+        .container {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            width: 400px;
+            text-align: center;
+            box-shadow: 0px 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .dark .container {
+            background: #2d3748;
+        }
+
+        input {
+            width: 90%;
+            padding: 10px;
+            margin: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            padding: 10px;
+            width: 95%;
+            border: none;
+            border-radius: 8px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #5a67d8;
+        }
+
+        .toggle {
+            margin-bottom: 10px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #result {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        canvas {
+            margin-top: 20px;
+        }
+    </style>
 </head>
+
 <body>
 
-<h2>🏠 House Price Prediction</h2>
+<div class="container">
 
-<input type="number" id="sqft" placeholder="Enter Area (sqft)"><br><br>
-<input type="number" id="bedrooms" placeholder="Enter Bedrooms"><br><br>
+    <div class="toggle" onclick="toggleDarkMode()">🌙 Toggle Dark Mode</div>
 
-<button onclick="predictPrice()">Predict</button>
+    <h2>🏠 House Price Predictor</h2>
 
-<h3 id="result"></h3>
+    <input type="number" id="sqft" placeholder="Area (sqft)">
+    <input type="number" id="bedrooms" placeholder="Bedrooms">
+
+    <button onclick="predictPrice()">Predict Price</button>
+
+    <div id="result"></div>
+
+    <!-- Chart -->
+    <canvas id="priceChart"></canvas>
+
+</div>
 
 <script>
+let chart;
+
+function toggleDarkMode() {
+    document.body.classList.toggle("dark");
+}
+
 async function predictPrice() {
     const sqft = document.getElementById("sqft").value;
     const bedrooms = document.getElementById("bedrooms").value;
 
+    if (!sqft || !bedrooms) {
+        document.getElementById("result").innerText = "⚠ Fill all fields";
+        return;
+    }
+
+    document.getElementById("result").innerText = "⏳ Predicting...";
+
     const response = await fetch("/predict", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
             sqft: parseFloat(sqft),
             bedrooms: parseInt(bedrooms)
@@ -31,8 +123,49 @@ async function predictPrice() {
     });
 
     const data = await response.json();
+
+    const price = data.predicted_price;
+
     document.getElementById("result").innerText =
-        "💰 Predicted Price: $" + data.predicted_price;
+        "💰 Predicted Price: $" + price;
+
+    // Generate graph data
+    const sqftRange = [500, 1000, 1500, 2000, 2500, 3000];
+
+    const prices = [];
+
+    for (let i = 0; i < sqftRange.length; i++) {
+        const res = await fetch("/predict", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                sqft: sqftRange[i],
+                bedrooms: parseInt(bedrooms)
+            })
+        });
+
+        const d = await res.json();
+        prices.push(d.predicted_price);
+    }
+
+    // Destroy old chart
+    if (chart) chart.destroy();
+
+    // Create new chart
+    const ctx = document.getElementById("priceChart");
+
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: sqftRange,
+            datasets: [{
+                label: 'Price vs Area',
+                data: prices,
+                borderWidth: 2,
+                fill: false
+            }]
+        }
+    });
 }
 </script>
 
